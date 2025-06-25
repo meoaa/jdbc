@@ -5,11 +5,11 @@ import hello.jdbc.repository.MemberRepositoryV1;
 
 import java.sql.SQLException;
 
-public class MemberService {
+public class MemberServiceV1 {
 
     private final MemberRepositoryV1 memberRepository;
 
-    public MemberService(MemberRepositoryV1 memberRepository) {
+    public MemberServiceV1(MemberRepositoryV1 memberRepository) {
         this.memberRepository = memberRepository;
     }
 

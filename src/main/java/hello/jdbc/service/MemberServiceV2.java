@@ -1,29 +1,66 @@
 package hello.jdbc.service;
 
 import hello.jdbc.domain.Member;
-import hello.jdbc.repository.MemberRepositoryV1;
+import hello.jdbc.repository.MemberRepositoryV2;
+import lombok.extern.slf4j.Slf4j;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.SQLException;
 
-public class MemberServiceV1 {
+@Slf4j
+public class MemberServiceV2 {
 
-    private final MemberRepositoryV1 memberRepository;
+    private final DataSource dataSource;
+    private final MemberRepositoryV2 memberRepository;
 
-    public MemberServiceV1(MemberRepositoryV1 memberRepository) {
+    public MemberServiceV2(DataSource dataSource, MemberRepositoryV2 memberRepository) {
+        this.dataSource = dataSource;
         this.memberRepository = memberRepository;
     }
 
     public void accountTransfer(String fromId, String toId, int money) throws SQLException{
-        Member fromMember = memberRepository.findById(fromId);
-        Member toMember = memberRepository.findById(toId);
+        Connection con = dataSource.getConnection();
+        try {
+            con.setAutoCommit(false);
+            boolean autoCommit = con.getAutoCommit();
+            log.info("auto commit={}", autoCommit);
+            bizLogic(con, fromId, toId, money);
+            log.info("after bizLogic");
+            con.commit();
+            log.info("after commit");
+        } catch (Exception e){
+            log.info("예외 영역");
+            con.rollback();
+            throw new IllegalStateException(e);
+        } finally {
+            release(con);
+        }
+    }
 
-        memberRepository.update(fromId, fromMember.getMoney() - money);
+    private void release(Connection con) {
+        if(con != null){
+            try {
+                con.setAutoCommit(true);
+                con.close();
+            } catch (Exception e) {
+                log.info("error ", e);
+            }
+        }
+    }
+
+    private void bizLogic(Connection con, String fromId, String toId, int money) throws SQLException {
+        Member fromMember = memberRepository.findById(con, fromId);
+        Member toMember = memberRepository.findById(con, toId);
+
+        memberRepository.update(con, fromId, fromMember.getMoney() - money);
         validation(toMember);
-        memberRepository.update(toId, toMember.getMoney() + money);
+        memberRepository.update(con, toId, toMember.getMoney() + money);
     }
 
     private static void validation(Member toMember) {
         if(toMember.getMemberId().equals("ex")){
+            log.info("예외 발생!!");
             throw new IllegalStateException("이체중 예외 발생");
         }
     }
